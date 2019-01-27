@@ -65,9 +65,13 @@ namespace myns {
         unique_ptr &operator=(const unique_ptr &) = delete;
 
         ~unique_ptr() {
-            if (del) {
-                del->destroy(p);
-                delete(del);
+            if(p) {
+                if (del) {
+                    del->destroy(p);
+                    delete (del);
+                } else {
+                    std::default_delete<T>()(p);
+                }
             }
         }
 
@@ -92,7 +96,7 @@ namespace myns {
             return *this;
         }
 
-        unique_ptr &operator=(nullptr_t) noexcept {
+        unique_ptr &operator=(std::nullptr_t) noexcept {
             reset();
             return *this;
         }
