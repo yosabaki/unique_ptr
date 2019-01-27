@@ -46,8 +46,7 @@ namespace myns {
 
         unique_ptr(std::nullptr_t) noexcept : p(nullptr), del(nullptr) {}
 
-        explicit unique_ptr(pointer p) noexcept : p(p),
-        del(new sep_deleter<std::default_delete<T>>(std::default_delete<T>())) {}
+        explicit unique_ptr(pointer p) noexcept : p(p), del(nullptr) {}
 
 
         template<typename U, typename = std::enable_if<std::is_convertible<U *, T *>::value>>
@@ -78,6 +77,7 @@ namespace myns {
         }
 
         unique_ptr &operator=(unique_ptr &&other) noexcept {
+            reset();
             std::swap(p,other.p);
             std::swap(del, other.del);
             return *this;
@@ -107,31 +107,36 @@ namespace myns {
             return ptr;
         }
 
-        void reset(pointer ptr = pointer()) noexcept {
-            if (del) {
-                del->destroy(p);
-                delete (del);
-                if (ptr) {
+        void reset(pointer ptr = nullptr) noexcept {
+            if (p) {
+                if (del) {
+                    del->destroy(p);
+                    delete (del);
                     del = nullptr;
                 } else {
-                    del = new sep_deleter<std::default_delete<T>>(ptr, std::default_delete<T>());
+                    std::default_delete<T>()(p);
                 }
             }
             p = ptr;
         }
 
         template<typename DeleterT>
-        void reset(pointer ptr, DeleterT deleter) noexcept {
-            if (del) {
-                del->destroy(p);
-                delete (del);
+        void reset(pointer ptr, DeleterT && deleter) noexcept {
+            if (p) {
+                if (del) {
+                    del->destroy(p);
+                    delete (del);
+                } else {
+                    std::default_delete<T>()(p);
+                }
             }
             p = ptr;
             del = new sep_deleter<DeleterT>(std::forward<DeleterT>(deleter));
         }
 
         void swap(unique_ptr<T> &other) noexcept {
-            std::swap(*this, other);
+            std::swap(p, other.p);
+            std::swap(del, other.del);
         }
 
         pointer get() const noexcept {
