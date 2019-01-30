@@ -22,13 +22,13 @@ T sum(const T &t, const Left &&...left) {
 struct Del {
     void operator()(int *ptr) {
         std::cout << "int deleter\n";
-        delete (ptr);
+        delete ptr;
     }
 };
 
 void function_deleter(int *a) {
     std::cout << "function_deleter\n";
-    delete (a);
+    delete a;
 }
 
 
@@ -65,14 +65,16 @@ int main() {
         myns::unique_ptr<int> reset_(new int(42));
 
         assert(reset_.get() != nullptr);
-        reset_.reset(new int(43), [](void *a) {
+        reset_.reset(new int(43), [](int *a) {
             std::cout << "lambda deleter\n";
-            delete (a);
+            delete a;
         });
     }
     {
         myns::unique_ptr<int> func(new int(44), &function_deleter);
     }
+
+    
 
 
     return 0;

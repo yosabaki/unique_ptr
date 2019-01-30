@@ -17,9 +17,9 @@ namespace myns {
     class unique_ptr {
         using pointer = T *;
         struct deleter {
-            deleter() {}
+            deleter() = default;
 
-            virtual ~deleter() {}
+            virtual ~deleter() = default;
 
             virtual void destroy(T*) = 0;
 
@@ -27,10 +27,9 @@ namespace myns {
 
         template<typename DelT>
         struct sep_deleter : public deleter {
-            sep_deleter( DelT &&del) : del(std::forward<DelT>(del)) {}
+            explicit sep_deleter( DelT &&del) : del(std::forward<DelT>(del)) {}
 
-            virtual ~sep_deleter() {
-            }
+            virtual ~sep_deleter() = default;
 
             virtual void destroy(T* ptr) {
                 if (ptr) {
@@ -65,17 +64,17 @@ namespace myns {
         unique_ptr &operator=(const unique_ptr &) = delete;
 
         ~unique_ptr() {
-            if(p) {
-                if (del) {
-                    del->destroy(p);
-                    delete (del);
-                } else {
-                    std::default_delete<T>()(p);
-                }
-            }
+            destroy();
         }
 
         unique_ptr &operator=(pointer ptr) {
+            reset(ptr);
+            return *this;
+        }
+
+        template<typename U>
+        typename std::enable_if<std::is_convertible<U *, T *>::value, unique_ptr &>::type
+        operator=(U* ptr) {
             reset(ptr);
             return *this;
         }
@@ -91,7 +90,7 @@ namespace myns {
         typename std::enable_if<std::is_convertible<U *, T *>::value, unique_ptr &>::type
         operator=(unique_ptr<U> &&other) noexcept {
             reset();
-            std::swap(del,other.del);
+            std::swap(p, other.p);
             std::swap(del, other.del);
             return *this;
         }
@@ -111,34 +110,36 @@ namespace myns {
             return ptr;
         }
 
+
+        template<typename U>
+        typename std::enable_if<std::is_convertible<U *, T *>::value, void>::type
+        reset(U* ptr = nullptr) noexcept {
+            destroy();
+            del = nullptr;
+            p = const_cast<pointer>(ptr);
+        }
+
         void reset(pointer ptr = nullptr) noexcept {
-            if (p) {
-                if (del) {
-                    del->destroy(p);
-                    delete (del);
-                    del = nullptr;
-                } else {
-                    std::default_delete<T>()(p);
-                }
-            }
+            destroy();
+            del = nullptr;
             p = ptr;
         }
 
         template<typename DeleterT>
         void reset(pointer ptr, DeleterT && deleter) noexcept {
-            if (p) {
-                if (del) {
-                    del->destroy(p);
-                    delete (del);
-                } else {
-                    std::default_delete<T>()(p);
-                }
-            }
-            p = ptr;
+            destroy();
             del = new sep_deleter<DeleterT>(std::forward<DeleterT>(deleter));
+            p = ptr;
         }
 
         void swap(unique_ptr<T> &other) noexcept {
+            std::swap(p, other.p);
+            std::swap(del, other.del);
+        }
+
+        template<typename U>
+        typename std::enable_if<std::is_convertible<U *, T *>::value, void>::type
+        swap(unique_ptr<U> &other) noexcept {
             std::swap(p, other.p);
             std::swap(del, other.del);
         }
@@ -160,6 +161,17 @@ namespace myns {
         }
 
     private:
+
+        void destroy() {
+            if (p) {
+                if (del) {
+                    del->destroy(p);
+                    delete (del);
+                } else {
+                    std::default_delete<T>()(p);
+                }
+            }
+        }
 
         deleter *del;
         pointer p;
